@@ -348,6 +348,10 @@ const LegacyServer = http.createServer((Request, Response) => {
         Response.writeHead(200);
         Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
     }
+    else {
+        Response.writeHead(200);
+        Response.end();
+    }
 });
 
 LegacyServer.listen(80, `0.0.0.0`, () => {
