@@ -1,4 +1,5 @@
 const https = require("https");
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { readFile } = require("fs/promises");
@@ -307,10 +308,6 @@ const server = https.createServer(SslOptions, (Request, Response) =>
         });
         Response.end(`ok`);
     }
-    else if(RequestUrl.pathname.startsWith(`.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
-        Response.writeHead(200);
-        Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
-    }
     else
     {
         Response.writeHead(404);
@@ -325,3 +322,34 @@ server.listen(PORT, `0.0.0.0`, () =>
         `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
     );
 });
+
+const LegacyServer = http.createServer((Request, Response) => {
+    let RequestUrl;
+    try
+    {
+        RequestUrl = new URL(Request.url, `http://localhost`);
+    }
+    catch
+    {
+        Response.writeHead(400);
+        Response.end();
+        return;
+    }
+    console.log(`|LEGACY| INFO | New request: ${RequestUrl.href}`);
+
+    if (RequestUrl.pathname.startsWith(`/health`)) {
+        console.log(`INFO | Received health check`);
+        Response.writeHead(200, {
+            "Content-Type": "text/plain; charset=utf-8"
+        });
+        Response.end(`ok`);
+    }
+    else if(RequestUrl.pathname.startsWith(`.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
+        Response.writeHead(200);
+        Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
+    }
+});
+
+LegacyServer.listen(80, `0.0.0.0`, () => {
+    console.log(`|LEGACY| INFO | Started legacy http support server`);
+})
