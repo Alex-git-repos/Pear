@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pear</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Gill Sans", sans-serif;
+      background-image: radial-gradient(
+        circle,
+        rgba(36, 37, 41, 1) 0%,
+        rgba(59, 45, 44, 1) 50%,
+        rgba(99, 45, 36, 1) 100%
+      );
+    }
+    h1 {
+      color: white;
+      font-weight: 200;
+    }
+  </style>
+</head>
+<body>
+  <div id="PearShim">
+    <h1>Enter Pear Resource to use</h1>
+    <input type="text" id="PearID">
+    <button id="PearFetchBtn">Load</button>
+  </div>
+
+  <script>
+  // Wrapped in an IIFE so nothing here lands in global scope. Top-level
+  // const/let can't be re-declared if this script runs more than once in
+  // the same window (e.g. when htmx re-inserts it).
+  (() => {
+    const Self = document.currentScript;
+    // Config comes from cookies (set elsewhere; they must NOT be HttpOnly,
+    // or document.cookie can't see them):
+    //   PEAR_FRONTEND - absolute URI of the frontend folder, e.g. http://localhost:5500/Frontend/
+    //   PEAR_BACKEND  - absolute URI of the backend,         e.g. http://localhost:80
+    function GetCookie(Name) {
+      for (const Pair of document.cookie.split("; ")) {
+        const EqIndex = Pair.indexOf("=");
+        if (EqIndex === -1 || Pair.slice(0, EqIndex) !== Name) continue;
+
+        const RawValue = Pair.slice(EqIndex + 1);
+        try {
+          return decodeURIComponent(RawValue);
+        } catch {
+          return RawValue;
+        }
+      }
+      return null;
+    }
+
+    const PEAR_BACKEND = GetCookie("PEAR_BACKEND");
+    // new URL("./Main.html", base) only stays in the folder if base ends in "/".
+    const PEAR_FRONTEND = GetCookie("PEAR_FRONTEND")?.replace(/\/*$/, "/") ?? null;
+
+    const Searches = new URLSearchParams(window.location.search);
+    const ResourceUri = Searches.get("resource_uri");
+    // Shim CSS lives in the script (not in the page's <head>) so it still
+    // works when only this script is delivered, e.g. via an htmx swap.
+    const ShimStyles = `
+      #PearShim.PearBar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2147483647;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px;
+        background-color: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(6px);
+      }
+      #PearShim.PearBar #PearID {
+        flex: 1;
+        min-width: 0;
+      }
+      #PearID {
+        font-family: "Segoe UI", "Gill Sans", sans-serif;
+        font-weight: 200;
+        color: rgb(119, 119, 119);
+        font-size: 2cap;
+        background-color: black;
+        border-radius: 10px;
+        padding: 4px;
+      }
+      #PearFetchBtn {
+        padding: 10px;
+        font-family: "Segoe UI", "Gill Sans", sans-serif;
+        font-weight: 500;
+        color: white;
+        background-color: black;
+        border-radius: 10px;
+        border-style: solid;
+        border-color: lightgrey;
+        border-width: 2px;
+      }
+      #PearFetchBtn:active {
+        border-color: grey;
+        border-width: 1px;
+      }
+    `;
+
+    function EnsureShimStyles() {
+      if (document.getElementById("PearShimStyle")) return;
+      const StyleEl = document.createElement("style");
+      StyleEl.id = "PearShimStyle";
+      StyleEl.textContent = ShimStyles;
+      document.head.appendChild(StyleEl);
+    }
+    EnsureShimStyles();
+
+    function IsValidUrl(Value) {
+      try {
+        new URL(Value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function BindShim() {
+      const PearFetchBtn = document.getElementById("PearFetchBtn");
+      const UrlBarContent = document.getElementById("PearID");
+      if (!PearFetchBtn || !UrlBarContent) {
+        console.warn("Pear shim elements not found; skipping bind.");
+        return;
+      }
+
+      PearFetchBtn.addEventListener("click", () => {
+        if (!PEAR_FRONTEND || !IsValidUrl(PEAR_FRONTEND)) {
+          alert("PEAR_FRONTEND cookie is missing or invalid!");
+          return;
+        }
+        if (!IsValidUrl(UrlBarContent.value)) {
+          alert("Invalid Resource!");
+          return;
+        }
+
+        const RedirectUrl = new URL("./Main.html", PEAR_FRONTEND);
+        // searchParams.set() already percent-encodes; don't encode twice.
+        RedirectUrl.searchParams.set("resource_uri", UrlBarContent.value);
+        window.location.href = RedirectUrl.href;
+      });
+
+      UrlBarContent.addEventListener("keydown", (EvnArgs) => {
+        if (EvnArgs.key === "Enter") PearFetchBtn.click();
+      });
+    }
+
+    async function FetchReplace() {
+      if (!PEAR_BACKEND || !IsValidUrl(PEAR_BACKEND)) {
+        alert("PEAR_BACKEND cookie is missing or invalid!");
+        return false;
+      }
+      if (!IsValidUrl(ResourceUri)) {
+        alert("Invalid Resource!");
+        return false;
+      }
+
+      const FetchUrl = new URL("/api/proxy", PEAR_BACKEND);
+      FetchUrl.searchParams.set("content_url", ResourceUri);
+
+      let PearApiResponse;
+      try {
+        PearApiResponse = await fetch(FetchUrl, {
+          method: "GET",
+          credentials: "include"
+        });
+      } catch (Err) {
+        console.error(Err);
+        alert("Failed to reach the Pear backend.");
+        return false;
+      }
+      if (!PearApiResponse.ok) {
+        alert(`Proxy request failed (${PearApiResponse.status})`);
+        return false;
+      }
+
+      // Replaces the whole document, including the original shim.
+      document.documentElement.innerHTML = await PearApiResponse.text();
+
+      function ReparseScripts(Root = document) {
+        for (const Old of Root.querySelectorAll("script")) {
+          if (Old === Self) continue;
+          const New = document.createElement("script");
+          for (const A of Old.attributes) New.setAttribute(A.name, A.value);
+          New.textContent = Old.textContent;
+          New.async = false; // keep original execution order for external scripts
+          Old.replaceWith(New);
+        }
+      }
+
+      ReparseScripts();
+      return true;
+    }
+
+    if (ResourceUri) {
+      FetchReplace()
+        .then((Replaced) => {
+          if (!Replaced) {
+            // Original shim is still on the page, so keep it usable.
+            BindShim();
+            return;
+          }
+
+          const NewShim = `
+            <div id="PearShim" class="PearBar">
+              <input type="text" id="PearID">
+              <button id="PearFetchBtn">Load</button>
+            </div>
+          `;
+          // The document was replaced, so the style element is gone too.
+          EnsureShimStyles();
+          // First in the DOM and fixed to the top of the viewport.
+          document.body.insertAdjacentHTML("afterbegin", NewShim);
+          BindShim();
+        })
+        .catch((Err) => {
+          console.error(Err);
+          alert("Failed to load resource.");
+        });
+    } else {
+      BindShim();
+    }
+  })();
+  </script>
+</body>
+</html>

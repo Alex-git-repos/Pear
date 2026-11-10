@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in to Pear Edu Services</title>
+  <style>
+    body {
+      background-image: radial-gradient(circle,rgba(36, 37, 41, 1) 0%, rgba(59, 45, 44, 1) 50%, rgba(99, 45, 36, 1) 100%);
+    }
+    #LoginPrompt {
+      position: fixed;
+      font-family: "Segoe UI", "Gill Sans";
+      font-weight: 400;
+      color: white;
+    }
+    #PasskeyBox {
+      font-family: "Segoe UI", "Gill Sans";
+      font-size: 1cap;
+      font-weight: 200;
+      color: rgb(119, 119, 119);
+      font-size: 2cap;
+      position: fixed;
+      top: 100px;
+      left: 15px;
+      background-color: black;
+      border-radius: 10px;
+      padding: 4px;
+    }
+    #PasskeyCheck {
+      position: fixed;
+      top: 100px;
+      left: 275px;
+      padding: 10px;
+      font-family: "Segoe UI", "Gill Sans";
+      font-weight: 500;
+      color: white;
+      background-color: black;
+      border-radius: 10px;
+      border-style: solid;
+      border-color: lightgrey;
+      border-width: 2px;
+    }
+    #PasskeyCheck:active {
+      border-color: grey;
+      border-width: 1px;
+    }
+    #PhishingNote {
+      color: white;
+      position: fixed;
+      top: 175px;
+      font-family: "Segoe UI", "Gill Sans";
+      font-weight: 200;
+    }
+  </style>
+</head>
+<body>
+  <article>
+    <h1 id="LoginPrompt">Enter a Pear one-time passkey to use Pear Services</h1>
+
+    <input type="text" id="PasskeyBox" contenteditable="true"></input>
+
+    <button id="PasskeyCheck">Log in</button>
+
+    <h2 id="PhishingNote">IMPORTANT NOTE: this is not a phishing site. To learn more about how to detect phishing, visit <a href="https://www.cisa.gov/secure-our-world/recognize-and-report-phishing" target="_blank">Recognize and Report Phishing</a>.</h2>
+  </article>
+  <footer>
+    <script src="./Config.js"></script>
+    <script>
+      async function VerifyAuth() {
+        let AuthUrl = new URL(`/api/initauth`, PEAR_BACKEND);
+        let ReqInit = {
+          "method": "POST",
+          "headers": {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          "credentials": "include"
+        };
+
+        const AuthReq = new Request(AuthUrl.href, ReqInit);
+        const EnteredAuthToken = document.getElementById(`PasskeyBox`).value;
+        let ReqBody = {
+          "body": JSON.stringify({"auth-token": EnteredAuthToken})
+        };
+
+        console.log(`Submitting JSON:`);
+        console.log({"auth-token": EnteredAuthToken});
+
+        try {
+          var AuthResponse = await fetch(AuthReq, ReqBody);
+        }
+        catch {
+          return false;
+        }
+
+        if(AuthResponse.status !== 200) return false;
+        else {
+          let BodyJson = await AuthResponse.json();
+          if(BodyJson === "" || BodyJson === null) return false;
+
+          console.log(BodyJson["auth-success"]);
+          return BodyJson["auth-success"];
+        }
+      }
+
+      const PasskeyCheckButton = document.getElementById(`PasskeyCheck`);
+      PasskeyCheckButton.addEventListener(`click`, () => {
+        console.log(`Authentication started`);
+        VerifyAuth().then(Success => {
+          if(Success) {
+            let RedirectUrl = new URL("./Index.html", PEAR_FRONTEND);
+
+            console.log(`Successfully authenticated! Redirecting...`);
+            window.location.href = RedirectUrl.href;
+            }
+            else {
+              alert(`Failed authentication!`);
+            }
+          },
+          Err => {
+            alert(`Failed authentication!`);
+          }
+        )
+      });
+    </script>
+  </footer>
+</body>
+</html>

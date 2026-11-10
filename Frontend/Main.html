@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="htmx-config"
+      content='{
+    "selfRequestsOnly": false,
+    "withCredentials": true
+  }'
+    />
+    <title>Pear Edu Services</title>
+    <script
+      src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.js"
+      integrity="sha384-gmJEF2eAKY4e+FDN+qtKIivWyb6ANwDB7JUdUybKgQspPKyEX/pIRZG/0uaRoW2C"
+      crossorigin="anonymous"
+    ></script>
+    <script src="./Config.js"></script>
+  </head>
+  <body
+    id="Contents"
+    hx-swap="innerHTML"
+    hx-trigger="click from:#LoadButton"
+  >
+    <button id="LoadButton">Load Pear Edu</button>
+
+    <style>
+      body {
+        font-family: "Segoe UI", "Gill Sans";
+        background-image: radial-gradient(
+         circle,
+         rgba(36, 37, 41, 1) 0%,
+         rgba(59, 45, 44, 1) 50%,
+         rgba(99, 45, 36, 1) 100%
+        );
+      }
+      #LoadButton {
+        padding: 10px;
+        font-family: "Segoe UI", "Gill Sans";
+        font-weight: 500;
+        color: white;
+        background-color: black;
+        border-radius: 10px;
+        border-style: solid;
+        border-color: lightgrey;
+        border-width: 2px;
+      }
+      #LoadButton:active {
+        border-color: grey;
+        border-width: 1px;
+      }
+    </style>
+
+    <script>
+      htmx.config.selfRequestsOnly = false;
+      htmx.config.withCredentials = true;
+
+      const Contents = document.getElementById(`Contents`);
+      let AttrUrl = new URL("/Main", PEAR_BACKEND);
+      Contents.setAttribute("hx-get", AttrUrl.href);
+      console.log(`Set load target: ${AttrUrl}`);
+      htmx.process(Contents);
+
+      console.log(`INJECT | Set HX-Get`);
+
+      function SetCookie(
+        Name,
+        Value,
+        Age = 3600,
+        Path = "/",
+        SameSite = "Lax"
+      ) {
+        let Cookie = `${Name}=${encodeURIComponent(Value)}`;
+        Cookie += `; Path=${Path}`;
+        Cookie += `; Max-Age=${Math.round(Age)}`;
+        Cookie += `; SameSite=${SameSite}`;
+        document.cookie = Cookie;
+      }
+      SetCookie(`PEAR_BACKEND`, PEAR_BACKEND);
+      SetCookie(`PEAR_FRONTEND`, PEAR_FRONTEND);
+
+      console.log(`CONFIG | Set cookies`);
+
+      const Searches = new URLSearchParams(window.location.search);
+      const ResourceUri = Searches.get("resource_uri");
+      if(Searches != "" && Searches != undefined && Searches != null) {
+        console.log(`LOADER | Triggering load`);
+        document.getElementById(`LoadButton`).click();
+      }
+    </script>
+  </body>
+</html>

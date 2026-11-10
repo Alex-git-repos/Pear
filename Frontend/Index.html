@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pear Services</title>
+  <style>
+    body {
+      background-image: radial-gradient(circle,rgba(36, 37, 41, 1) 0%, rgba(59, 45, 44, 1) 50%, rgba(99, 45, 36, 1) 100%);
+    }
+    h1 {
+      color: white;
+      font-family: 'Segoe UI', 'Gill Sans';
+      font-weight: 400;
+    }
+  </style>
+</head>
+<body>
+  <article>
+    <div class="AuthCheckWindow">
+      <h1>Verifying if you are authorized to use Pear Services...</h1>
+    </div>
+  </article>
+  <footer>
+    <script src="./Config.js"></script>
+    <script>
+      const PEAR_FRONTEND_URL = new URL(PEAR_FRONTEND);
+    
+      let Cookies = Object.fromEntries(document.cookie.split(`; `).map(
+        CookiePair => CookiePair.split(`=`).map(decodeURIComponent)
+      ));
+
+      let ReqInitInf = {
+        "method": "GET",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "credentials": "include"
+      }
+      
+      async function AuthReqSender() {
+        let ReqUrl = new URL(`/api/auth`, PEAR_BACKEND);
+        let AuthReq = new Request(ReqUrl.href, ReqInitInf);
+
+        let AuthResponse = await fetch(AuthReq);
+        return AuthResponse.json();
+      }
+
+      let AuthResult = null;
+      AuthReqSender().then((AsyncAuthRes) => {AuthResult = AsyncAuthRes; return;}).then(() => {
+        console.log(`Authenticated with response of`, AuthResult);
+        if(AuthResult["auth-success"]) {
+          console.log(`Authenticated to use Pear!`);
+          let Redirect = new URL("./Main.html", PEAR_FRONTEND);
+          window.location.href = Redirect.href;
+        }
+        else {
+          let Redirect = new URL("./Login.html", PEAR_FRONTEND);
+          window.location.href = Redirect.href;
+        }
+      });
+    </script>
+  </footer>
+</body>
+</html>
