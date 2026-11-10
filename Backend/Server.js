@@ -316,12 +316,12 @@ const server = https.createServer(SslOptions, (Request, Response) =>
 });
 
 const PORT = process.env.PORT;
-server.listen(PORT, `0.0.0.0`, () =>
-{
-    console.log(
-        `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
-    );
-});
+// server.listen(PORT, `0.0.0.0`, () =>
+// {
+//     console.log(
+//         `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
+//     );
+// });
 
 const LegacyServer = http.createServer((Request, Response) => {
     let RequestUrl;
