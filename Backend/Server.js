@@ -1,4 +1,6 @@
-const http = require("http");
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const { readFile } = require("fs/promises");
 const { RewriteContent } = require("./Inject.js");
 
@@ -41,7 +43,7 @@ async function DispatchProxyCall(Request, Response)
     }
 
     // Only the path and query are used, so the base host is irrelevant (a malformed Host header must not be able to throw here)
-    const RequestUrl = new URL(Request.url, `http://localhost`);
+    const RequestUrl = new URL(Request.url, `https://localhost`);
 
     let TargetUrl;
     try
@@ -235,12 +237,17 @@ async function DispatchPageCall(Request, Response)
     return;
 }
 
-const server = http.createServer((Request, Response) =>
+const SslOptions = {
+  "key": fs.readFileSync(path.join("./Certs/", 'key.pem')),
+  "cert": fs.readFileSync(path.join("./Certs/", 'cert.pem'))
+};
+
+const server = https.createServer(SslOptions, (Request, Response) =>
 {
     let RequestUrl;
     try
     {
-        RequestUrl = new URL(Request.url, `http://localhost`);
+        RequestUrl = new URL(Request.url, `https://localhost`);
     }
     catch
     {
@@ -299,6 +306,10 @@ const server = http.createServer((Request, Response) =>
             "Content-Type": "text/plain; charset=utf-8"
         });
         Response.end(`ok`);
+    }
+    else if(RequestUrl.pathname.startsWith(`.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
+        Response.writeHead(200);
+        Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
     }
     else
     {
