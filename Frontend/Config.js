@@ -1,2 +1,2 @@
-const PEAR_FRONTEND = "http://localhost:5500/Frontend/"; // URI only
-const PEAR_BACKEND = "http://localhost:80/"; // URI only
+const PEAR_FRONTEND = "https://pearpocket.s3.ap-southeast-1.amazonaws.com/"; // URI only
+const PEAR_BACKEND = "http://pear.onrender.com/"; // URI only

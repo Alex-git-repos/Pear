@@ -293,6 +293,13 @@ const server = http.createServer((Request, Response) =>
         console.log(`INFO | Serving main proxy page`);
         DispatchPageCall(Request, Response);
     }
+    else if (RequestUrl.pathname.startsWith(`/health`)) {
+        console.log(`INFO | Received health check`);
+        Response.writeHead(200, {
+            "Content-Type": "text/plain; charset=utf-8"
+        });
+        Response.end(`ok`);
+    }
     else
     {
         Response.writeHead(404);
@@ -301,7 +308,7 @@ const server = http.createServer((Request, Response) =>
 });
 
 const PORT = process.env.PORT;
-server.listen(PORT, `localhost`, () =>
+server.listen(PORT, `0.0.0.0`, () =>
 {
     console.log(
         `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
