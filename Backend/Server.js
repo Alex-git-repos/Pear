@@ -344,19 +344,12 @@ const LegacyServer = http.createServer((Request, Response) => {
         });
         Response.end(`ok`);
     }
-    else if(RequestUrl.pathname.startsWith(`/.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
-        console.log(`|LEGACY| INFO | Serving HTTP Challenge`)
-        Response.writeHead(200, {
-            "Content-Type": "application/octet-stream"
-        });
-        Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
-    }
     else {
         Response.writeHead(200);
         Response.end();
     }
 });
 
-// LegacyServer.listen(80, `0.0.0.0`, () => {
-//     console.log(`|LEGACY| INFO | Started legacy http support server`);
-// })
+LegacyServer.listen(80, `0.0.0.0`, () => {
+    console.log(`|LEGACY| INFO | Started legacy http support server`);
+})
