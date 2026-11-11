@@ -1,3 +1,4 @@
+const net = require('net');
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
@@ -243,7 +244,7 @@ const SslOptions = {
   "cert": fs.readFileSync(path.join("./Certs/", 'fullchain.pem'))
 };
 
-const server = https.createServer(SslOptions, (Request, Response) =>
+const Server = https.createServer(SslOptions, (Request, Response) =>
 {
     let RequestUrl;
     try
@@ -315,14 +316,6 @@ const server = https.createServer(SslOptions, (Request, Response) =>
     }
 });
 
-const PORT = process.env.PORT;
-server.listen(PORT, `0.0.0.0`, () =>
-{
-    console.log(
-        `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
-    );
-});
-
 const LegacyServer = http.createServer((Request, Response) => {
     let RequestUrl;
     try
@@ -350,6 +343,28 @@ const LegacyServer = http.createServer((Request, Response) => {
     }
 });
 
-LegacyServer.listen(80, `0.0.0.0`, () => {
-    console.log(`|LEGACY| INFO | Started legacy http support server`);
+const PORT = process.env.PORT;
+const MasterServer = net.createServer((socket) => {
+    socket.once('data', (buffer) => {
+    // Put the data back into the socket stream so the HTTP/HTTPS parsers can read it
+    socket.unshift(buffer);
+
+    // Byte 22 (0x16) indicates a TLS Handshake
+    if (buffer[0] === 22) {
+      Server.emit('connection', socket);
+    } else {
+      LegacyServer.emit('connection', socket);
+    }
+  });
+
+  socket.on('error', (err) => {
+    // Handle socket errors gracefully to avoid server crashes
+    console.error('ERR | Socket error:', err);
+  });
+});
+
+MasterServer.listen(PORT, () => {
+    console.log(
+        `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
+    );
 })
