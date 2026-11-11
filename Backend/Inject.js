@@ -581,4 +581,4 @@ function RewriteContent(BodyContent, OriginUrlString, ContentType) {
   }
 }
 
-module.exports = {RewriteContent, HashName};
+module.exports = {RewriteContent, HashName, GetFrontend};
