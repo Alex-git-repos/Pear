@@ -239,8 +239,8 @@ async function DispatchPageCall(Request, Response)
 }
 
 const SslOptions = {
-  "key": fs.readFileSync(path.join("./Certs/", 'key.pem')),
-  "cert": fs.readFileSync(path.join("./Certs/", 'cert.pem'))
+  "key": fs.readFileSync(path.join("./Certs/", 'privkey.pem')),
+  "cert": fs.readFileSync(path.join("./Certs/", 'fullchain.pem'))
 };
 
 const server = https.createServer(SslOptions, (Request, Response) =>
@@ -316,12 +316,12 @@ const server = https.createServer(SslOptions, (Request, Response) =>
 });
 
 const PORT = process.env.PORT;
-// server.listen(PORT, `0.0.0.0`, () =>
-// {
-//     console.log(
-//         `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
-//     );
-// });
+server.listen(PORT, `0.0.0.0`, () =>
+{
+    console.log(
+        `INFO | Server started at port ${PORT} | Auth token is ${process.env.AUTH_TOKEN}`
+    );
+});
 
 const LegacyServer = http.createServer((Request, Response) => {
     let RequestUrl;
@@ -357,6 +357,6 @@ const LegacyServer = http.createServer((Request, Response) => {
     }
 });
 
-LegacyServer.listen(80, `0.0.0.0`, () => {
-    console.log(`|LEGACY| INFO | Started legacy http support server`);
-})
+// LegacyServer.listen(80, `0.0.0.0`, () => {
+//     console.log(`|LEGACY| INFO | Started legacy http support server`);
+// })
