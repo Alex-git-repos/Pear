@@ -344,7 +344,7 @@ const LegacyServer = http.createServer((Request, Response) => {
         });
         Response.end(`ok`);
     }
-    else if(RequestUrl.pathname.startsWith(`.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
+    else if(RequestUrl.pathname.startsWith(`/.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
         console.log(`|LEGACY| INFO | Serving HTTP Challenge`)
         Response.writeHead(200, {
             "Content-Type": "application/octet-stream"
