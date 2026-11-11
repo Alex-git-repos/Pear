@@ -47,7 +47,10 @@
       }
 
       let AuthResult = null;
-      AuthReqSender().then((AsyncAuthRes) => {AuthResult = AsyncAuthRes; return;}).then(() => {
+      AuthReqSender().then((AsyncAuthRes) => {AuthResult = AsyncAuthRes; return;}, () => {
+        // Backend unreachable or sent a bad response: treat as not authenticated instead of hanging here
+        AuthResult = {"auth-success": false};
+      }).then(() => {
         console.log(`Authenticated with response of`, AuthResult);
         if(AuthResult["auth-success"]) {
           console.log(`Authenticated to use Pear!`);
