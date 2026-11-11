@@ -338,14 +338,17 @@ const LegacyServer = http.createServer((Request, Response) => {
     console.log(`|LEGACY| INFO | New request: ${RequestUrl.href}`);
 
     if (RequestUrl.pathname.startsWith(`/health`)) {
-        console.log(`INFO | Received health check`);
+        console.log(`|LEGACY| INFO | Received health check`);
         Response.writeHead(200, {
             "Content-Type": "text/plain; charset=utf-8"
         });
         Response.end(`ok`);
     }
     else if(RequestUrl.pathname.startsWith(`.well-known/acme-challenge/uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A`)) {
-        Response.writeHead(200);
+        console.log(`|LEGACY| INFO | Serving HTTP Challenge`)
+        Response.writeHead(200, {
+            "Content-Type": "application/octet-stream"
+        });
         Response.end(`uzXEmBYaNvkWdMxZdzXF_soRe36YxHJUaeAY6Avrc-A.OLL3X3EDq7nmnSVCcscSKwYlXTOT6GSTXcTuIgnXY60`);
     }
     else {
