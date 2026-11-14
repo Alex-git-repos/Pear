@@ -20,6 +20,31 @@
       color: white;
       font-weight: 200;
     }
+    /* Landing page only. Over a proxied page the same controls are built inside a shadow root (CreateBar). */
+    #PearID {
+      font-family: "Segoe UI", "Gill Sans", sans-serif;
+      font-weight: 200;
+      color: rgb(119, 119, 119);
+      font-size: 2cap;
+      background-color: black;
+      border-radius: 10px;
+      padding: 4px;
+    }
+    #PearFetchBtn {
+      padding: 10px;
+      font-family: "Segoe UI", "Gill Sans", sans-serif;
+      font-weight: 500;
+      color: white;
+      background-color: black;
+      border-radius: 10px;
+      border-style: solid;
+      border-color: lightgrey;
+      border-width: 2px;
+    }
+    #PearFetchBtn:active {
+      border-color: grey;
+      border-width: 1px;
+    }
   </style>
   <div id="PearShim">
     <h1>Enter Pear Resource to use</h1>
@@ -33,6 +58,9 @@
   // the same window (e.g. when htmx re-inserts it).
   (() => {
     const Self = document.currentScript;
+    // Taken now, before a proxied page has run: such a page's runtime shim wraps getElementById() (and
+    // friends) to hash ids and classes, so afterwards these lookups would no longer find our own elements.
+    const GetById = Document.prototype.getElementById.bind(document);
     // Config comes from cookies (set elsewhere; they must NOT be HttpOnly,
     // or document.cookie can't see them):
     //   PEAR_FRONTEND - absolute URI of the frontend folder, e.g. http://localhost:5500/Frontend/
@@ -58,15 +86,40 @@
 
     const Searches = new URLSearchParams(window.location.search);
     const ResourceUri = Searches.get("resource_uri");
-    // Shim CSS lives in the script (not in the page's <head>) so it still
-    // works when only this script is delivered, e.g. via an htmx swap.
-    const ShimStyles = `
-      #PearShim.PearBar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 2147483647;
+
+    // -----------------------------------------------------------------------
+    // The bar shown over a proxied page
+    //
+    // The page we show is somebody else's: its CSS, its selectors and its scripts must not be able to touch
+    // the bar, and the bar must not take space from (or cover) the page. So:
+    //  - the controls live in a shadow root, which page stylesheets and document.querySelector() cannot reach,
+    //    and their styles use plain element selectors (the shim hashes class/id, which would break class names);
+    //  - the host element is styled inline with !important. Inline !important beats any !important in a page
+    //    stylesheet, and "all: initial" first wipes whatever the page's rules would otherwise inherit into it;
+    //  - the host sits in normal flow between <head> and <body> (outside <body>, so selectors like
+    //    "body > :first-child" miss it), position: sticky keeps it on screen while scrolling, and being in
+    //    flow means the page starts below the bar instead of underneath it.
+    // -----------------------------------------------------------------------
+    const BAR_HOST_STYLE = [
+      ["all", "initial"],
+      ["display", "block"],
+      ["position", "sticky"],
+      ["top", "0"],
+      ["left", "0"],
+      ["width", "100%"],
+      ["flex", "none"],
+      ["margin", "0"],
+      ["padding", "0"],
+      ["border", "0"],
+      ["z-index", "2147483647"],
+      ["isolation", "isolate"]
+    ];
+
+    const BAR_STYLES = `
+      * {
+        box-sizing: border-box;
+      }
+      div {
         display: flex;
         gap: 8px;
         align-items: center;
@@ -74,11 +127,9 @@
         background-color: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(6px);
       }
-      #PearShim.PearBar #PearID {
+      input {
         flex: 1;
         min-width: 0;
-      }
-      #PearID {
         font-family: "Segoe UI", "Gill Sans", sans-serif;
         font-weight: 200;
         color: rgb(119, 119, 119);
@@ -87,7 +138,7 @@
         border-radius: 10px;
         padding: 4px;
       }
-      #PearFetchBtn {
+      button {
         padding: 10px;
         font-family: "Segoe UI", "Gill Sans", sans-serif;
         font-weight: 500;
@@ -98,20 +149,60 @@
         border-color: lightgrey;
         border-width: 2px;
       }
-      #PearFetchBtn:active {
+      button:active {
         border-color: grey;
         border-width: 1px;
       }
     `;
 
-    function EnsureShimStyles() {
-      if (document.getElementById("PearShimStyle")) return;
-      const StyleEl = document.createElement("style");
-      StyleEl.id = "PearShimStyle";
-      StyleEl.textContent = ShimStyles;
-      document.head.appendChild(StyleEl);
+    function CreateBar() {
+      const Host = document.createElement("pear-shim");
+      for (const [Property, Value] of BAR_HOST_STYLE) {
+        Host.style.setProperty(Property, Value, "important");
+      }
+
+      // "closed": the proxied page's scripts get no handle on it through Host.shadowRoot
+      const Root = Host.attachShadow({ mode: "closed" });
+
+      const Style = document.createElement("style");
+      Style.textContent = BAR_STYLES;
+
+      const Bar = document.createElement("div");
+      const Input = document.createElement("input");
+      Input.type = "text";
+      Input.spellcheck = false;
+      Input.autocomplete = "off";
+      const Button = document.createElement("button");
+      Button.type = "button";
+      Button.textContent = "Load";
+      Bar.append(Input, Button);
+      Root.append(Style, Bar);
+
+      // Typing in the bar must not trigger the page's own keyboard shortcuts.
+      for (const Type of ["keydown", "keyup", "keypress"]) {
+        Root.addEventListener(Type, (EvnArgs) => EvnArgs.stopPropagation());
+      }
+
+      return { Host, Input, Button };
     }
-    EnsureShimStyles();
+
+    function MountBar(Host) {
+      const Place = () => {
+        const Html = document.documentElement;
+        // document.body may be null for odd pages; insertBefore(x, null) then appends.
+        if (Host.parentNode !== Html) Html.insertBefore(Host, document.body);
+      };
+      Place();
+      // A page that rebuilds its document tree must not be able to drop the bar.
+      new MutationObserver(Place).observe(document.documentElement, { childList: true });
+
+      // In-page links (#section) would scroll their target to the very top, under the bar.
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(() => {
+          document.documentElement.style.setProperty("scroll-padding-top", `${Host.offsetHeight}px`, "important");
+        }).observe(Host);
+      }
+    }
 
     function IsValidUrl(Value) {
       try {
@@ -122,9 +213,7 @@
       }
     }
 
-    function BindShim() {
-      const PearFetchBtn = document.getElementById("PearFetchBtn");
-      const UrlBarContent = document.getElementById("PearID");
+    function BindShim(PearFetchBtn, UrlBarContent) {
       if (!PearFetchBtn || !UrlBarContent) {
         console.warn("Pear shim elements not found; skipping bind.");
         return;
@@ -147,7 +236,7 @@
       });
 
       UrlBarContent.addEventListener("keydown", (EvnArgs) => {
-        if (EvnArgs.key === "Enter") PearFetchBtn.click();
+        if (EvnArgs.key === "Enter" && !EvnArgs.isComposing) PearFetchBtn.click();
       });
     }
 
@@ -180,7 +269,7 @@
         return false;
       }
 
-      // Replaces the whole document, including the original shim.
+      // Replaces the whole document, including the landing page.
       document.documentElement.innerHTML = await PearApiResponse.text();
 
       function ReparseScripts(Root = document) {
@@ -202,29 +291,22 @@
       FetchReplace()
         .then((Replaced) => {
           if (!Replaced) {
-            // Original shim is still on the page, so keep it usable.
-            BindShim();
+            // The landing page is still on the page, so keep it usable.
+            BindShim(GetById("PearFetchBtn"), GetById("PearID"));
             return;
           }
 
-          const NewShim = `
-            <div id="PearShim" class="PearBar">
-              <input type="text" id="PearID">
-              <button id="PearFetchBtn">Load</button>
-            </div>
-          `;
-          // The document was replaced, so the style element is gone too.
-          EnsureShimStyles();
-          // First in the DOM and fixed to the top of the viewport.
-          document.body.insertAdjacentHTML("afterbegin", NewShim);
-          BindShim();
+          // The document was replaced, so the landing page is gone; build the bar fresh.
+          const Bar = CreateBar();
+          MountBar(Bar.Host);
+          BindShim(Bar.Button, Bar.Input);
         })
         .catch((Err) => {
           console.error(Err);
           alert("Failed to load resource.");
         });
     } else {
-      BindShim();
+      BindShim(GetById("PearFetchBtn"), GetById("PearID"));
     }
   })();
   </script>
