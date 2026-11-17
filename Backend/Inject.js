@@ -643,6 +643,123 @@ function ShimMain(C) {
   };
 
   // -------------------------------------------------------------------------
+  // Query strings that scripts build
+  //
+  // The browser's address is [frontend]/Main.html?resource_uri=<proxied page>, so anything that edits "the
+  // query" or "the URL" of the current page edits the wrong one. Each case below keeps the proxied page's own
+  // URL, query string included, inside resource_uri:
+  //  - GET forms: the browser replaces the action's query with the form fields, which would drop resource_uri
+  //  - history.pushState / replaceState: relative URLs ("?q=x", "/search?q=x") resolve against the proxied page
+  //  - a.search / area.search: read and write the proxied page's query, not resource_uri
+  // (location.assign / location.search = ... cannot be intercepted by script. The frontend folds whatever
+  // stray params such a navigation leaves on Main.html back into resource_uri, see ResolveResourceUri.)
+  // -------------------------------------------------------------------------
+
+  // The proxied page's URL when Href is a [frontend]/Main.html?resource_uri=... URL, otherwise null
+  function TargetOf(Href) {
+    try {
+      var A = new URL(String(Href), location.href);
+      if (A.origin + A.pathname !== C.Main) return null;
+      var T = A.searchParams.get("resource_uri");
+      return T ? new URL(T) : null;
+    } catch (E) {
+      return null;
+    }
+  }
+
+  // The URL of the proxied page being shown right now
+  function CurrentTarget() {
+    return TargetOf(location.href) || new URL(C.Base);
+  }
+
+  // GET forms. The entry list is built AFTER the submit event has run, so a field added here (or by the
+  // page's own handlers) is part of the submission. The extra field carries the proxied action URL, without
+  // its query because a GET submission replaces that. It is removed again right after the submission
+  // started so the page never finds it (FormData(form), form.elements, ...).
+  function PrepareForm(Form, Submitter) {
+    try {
+      var Method = Submitter && Submitter.hasAttribute("formmethod") ? Submitter.formMethod : Form.method;
+      if (String(Method).toLowerCase() !== "get") return null;
+      var Action = Submitter && Submitter.hasAttribute("formaction") ? Submitter.formAction : Form.action;
+      var T = TargetOf(Action);
+      if (!T) return null;
+      T.search = "";
+      T.hash = "";
+      var In = document.createElement("input");
+      In.type = "hidden";
+      In.name = "resource_uri";
+      In.value = T.href;
+      Form.appendChild(In);
+      return function () { if (In.parentNode) In.parentNode.removeChild(In); };
+    } catch (E) {
+      return null;
+    }
+  }
+
+  window.addEventListener("submit", function (Ev) {
+    if (Ev.defaultPrevented) return; // the page submits it some other way (fetch, form.submit() later, ...)
+    var Undo = PrepareForm(Ev.target, Ev.submitter);
+    if (Undo) setTimeout(Undo, 0);
+  });
+  if (window.HTMLFormElement) {
+    WrapMethod(HTMLFormElement.prototype, "submit", function (Orig) {
+      return function () {
+        var Undo = PrepareForm(this, null);
+        try {
+          return Orig.apply(this, arguments);
+        } finally {
+          if (Undo) Undo();
+        }
+      };
+    });
+  }
+
+  // history.pushState / replaceState
+  if (window.History) {
+    ["pushState", "replaceState"].forEach(function (Name) {
+      WrapMethod(History.prototype, Name, function (Orig) {
+        return function (State, Title, Url) {
+          try {
+            if (Url !== undefined && Url !== null) {
+              var Base = CurrentTarget();
+              var A = new URL(String(Url), Base);
+              // Another origin: leave it alone so the browser throws its usual SecurityError
+              if (A.origin === Base.origin && A.origin + A.pathname !== C.Main) Url = P(A.href, true);
+            }
+          } catch (E) {}
+          return Orig.call(this, State, Title, Url);
+        };
+      });
+    });
+  }
+
+  // anchor.search / area.search
+  [window.HTMLAnchorElement, window.HTMLAreaElement].forEach(function (Ctor) {
+    try {
+      if (!Ctor) return;
+      var S = Object.getOwnPropertyDescriptor(Ctor.prototype, "search");
+      var Hr = Object.getOwnPropertyDescriptor(Ctor.prototype, "href");
+      if (!S || !S.get || !S.set || !Hr || !Hr.get || !Hr.set) return;
+      Object.defineProperty(Ctor.prototype, "search", {
+        configurable: true,
+        enumerable: S.enumerable,
+        get: function () {
+          var T = TargetOf(Hr.get.call(this));
+          return T ? T.search : S.get.call(this);
+        },
+        set: function (V) {
+          var Href = Hr.get.call(this);
+          var T = TargetOf(Href);
+          if (!T) return S.set.call(this, V);
+          var Old = new URL(Href, location.href);
+          T.search = V;
+          Hr.set.call(this, P(T.href, true) + (Old.hash || ""));
+        }
+      });
+    } catch (E) {}
+  });
+
+  // -------------------------------------------------------------------------
   // Markup and styles that scripts create
   // -------------------------------------------------------------------------
 

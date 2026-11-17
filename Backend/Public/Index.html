@@ -84,8 +84,57 @@
     // new URL("./Main.html", base) only stays in the folder if base ends in "/".
     const PEAR_FRONTEND = GetCookie("PEAR_FRONTEND")?.replace(/\/*$/, "/") ?? null;
 
-    const Searches = new URLSearchParams(window.location.search);
-    const ResourceUri = Searches.get("resource_uri");
+    // -----------------------------------------------------------------------
+    // The proxied page's URL: resource_uri, with the proxied page's own query params folded into it
+    //
+    // A proxied page's query string belongs INSIDE resource_uri (percent-encoded, so its "?" and "&" are
+    // not mistaken for ours). It ends up outside when something submits or navigates to
+    //   Main.html?q=cats&sca_esv=abc&resource_uri=https%3A%2F%2Fwww.google.com%2Fsearch
+    // for example a GET form (the browser serializes the fields into the query of the form's action URL), or a
+    // script that did location.search += "&x=1". Here those params are moved into the proxied URL and the
+    // address bar is rewritten to the canonical Main.html?resource_uri=<whole url>, so reloading, bookmarking
+    // and copying the link all keep working. A param that the proxied URL already has is replaced, the way a
+    // GET submission replaces its action's query; repeated params are all kept.
+    // Returns null when there is no resource_uri.
+    // -----------------------------------------------------------------------
+    function ResolveResourceUri() {
+      const Params = new URLSearchParams(window.location.search);
+      const Raw = Params.get("resource_uri");
+      if (Raw === null) return null;
+
+      const Extras = new Map();
+      for (const [Key, Value] of Params) {
+        if (Key === "resource_uri") continue;
+        if (!Extras.has(Key)) Extras.set(Key, []);
+        Extras.get(Key).push(Value);
+      }
+      if (Extras.size === 0) return Raw;
+
+      let Target;
+      try {
+        Target = new URL(Raw);
+      } catch {
+        return Raw; // not a URL: the caller reports it as an invalid resource
+      }
+      for (const [Key, Values] of Extras) {
+        Target.searchParams.delete(Key);
+        for (const Value of Values) Target.searchParams.append(Key, Value);
+      }
+      // A fragment is never sent to a server; the one on Main.html (if any) stays where it is.
+      Target.hash = "";
+
+      try {
+        const Canonical = new URL(window.location.href);
+        Canonical.search = "";
+        Canonical.searchParams.set("resource_uri", Target.href);
+        history.replaceState(history.state, "", Canonical.href);
+      } catch (Err) {
+        console.warn("Could not rewrite the address bar:", Err);
+      }
+      return Target.href;
+    }
+
+    const ResourceUri = ResolveResourceUri();
 
     // -----------------------------------------------------------------------
     // The bar shown over a proxied page
